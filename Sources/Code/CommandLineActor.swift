@@ -67,7 +67,7 @@ public class CommandLineActor {
 
     private func actOnCode(path: String, override: Bool, verbose: Bool, localizable: String, defaultToKeys: Bool, additive: Bool,
                            overrideComments: Bool, useExtractLocStrings: Bool, sortByKeys: Bool, unstripped: Bool, customFunction: String?) {
-        let allLocalizableStringsFilePaths = StringsFilesSearch.shared.findAllStringsFiles(within: localizable)
+        var allLocalizableStringsFilePaths = StringsFilesSearch.shared.findAllStringsFiles(within: localizable)
 
         guard !allLocalizableStringsFilePaths.isEmpty else {
             printError("No `*.strings` file found for output.\nTo fix this, please add a `Localizable.strings` file to your project and click the localize button for the file in Xcode. Custom names for your `*.strings` file do also work. Alternatively remove the line beginning with `bartycrouch code` in your build script to remove this feature entirely if you don't need it.\nSee https://github.com/Flinesoft/BartyCrouch/issues/11 for further information.") // swiftlint:disable:this line_length
@@ -77,9 +77,15 @@ public class CommandLineActor {
         for localizableStringsFilePath in allLocalizableStringsFilePaths {
             guard FileManager.default.fileExists(atPath: localizableStringsFilePath) else {
                 printError("No file exists at output path '\(localizableStringsFilePath)'")
-                exit(EX_NOINPUT)
+				allLocalizableStringsFilePaths.remove(at: allLocalizableStringsFilePaths.index(of: localizableStringsFilePath)!)
+				continue
             }
         }
+
+		if allLocalizableStringsFilePaths.isEmpty {
+			printError("No `*.strings` file found for output.")
+			exit(EX_NOINPUT)
+		}
 
         self.incrementalCodeUpdate(
             inputDirectoryPath: path, allLocalizableStringsFilePaths, override: override, verbose: verbose, defaultToKeys: defaultToKeys,
@@ -99,19 +105,25 @@ public class CommandLineActor {
         for inputFilePath in inputFilePaths {
             guard FileManager.default.fileExists(atPath: inputFilePath) else {
                 printError("No file exists at input path '\(inputFilePath)'")
-                exit(EX_NOINPUT)
+                continue
             }
 
-            let outputStringsFilePaths = StringsFilesSearch.shared.findAllLocalesForStringsFile(sourceFilePath: inputFilePath).filter { $0 != inputFilePath }
+            var outputStringsFilePaths = StringsFilesSearch.shared.findAllLocalesForStringsFile(sourceFilePath: inputFilePath).filter { $0 != inputFilePath }
 
             for outputStringsFilePath in outputStringsFilePaths {
                 guard FileManager.default.fileExists(atPath: outputStringsFilePath) else {
                     printError("No file exists at output path '\(outputStringsFilePath)'.")
-                    exit(EX_CONFIG)
+					outputStringsFilePaths.remove(at: outputStringsFilePaths.index(of: outputStringsFilePath)!)
+					continue
                 }
             }
 
-            self.incrementalInterfacesUpdate(
+			if outputStringsFilePaths.isEmpty {
+				printError("No output file for input path '\(inputFilePath)'.")
+				continue
+			}
+
+			self.incrementalInterfacesUpdate(
                 inputFilePath, outputStringsFilePaths, override: override, verbose: verbose, defaultToBase: defaultToBase, unstripped: unstripped
             )
         }
@@ -128,19 +140,25 @@ public class CommandLineActor {
         for inputFilePath in inputFilePaths {
             guard FileManager.default.fileExists(atPath: inputFilePath) else {
                 printError("No file exists at input path '\(inputFilePath)'")
-                exit(EX_NOINPUT)
+                continue
             }
 
-            let outputStringsFilePaths = StringsFilesSearch.shared.findAllLocalesForStringsFile(sourceFilePath: inputFilePath).filter { $0 != inputFilePath }
+            var outputStringsFilePaths = StringsFilesSearch.shared.findAllLocalesForStringsFile(sourceFilePath: inputFilePath).filter { $0 != inputFilePath }
 
             for outputStringsFilePath in outputStringsFilePaths {
                 guard FileManager.default.fileExists(atPath: outputStringsFilePath) else {
                     printError("No file exists at output path '\(outputStringsFilePath)'.")
-                    exit(EX_CONFIG)
+					outputStringsFilePaths.remove(at: outputStringsFilePaths.index(of: outputStringsFilePath)!)
+                    continue
                 }
             }
 
-            self.translate(id: id, secret: secret, inputFilePath, outputStringsFilePaths, override: override, verbose: verbose)
+			if outputStringsFilePaths.isEmpty {
+				printError("No output file for input path '\(inputFilePath)'.")
+				continue
+			}
+
+			self.translate(id: id, secret: secret, inputFilePath, outputStringsFilePaths, override: override, verbose: verbose)
         }
     }
 
